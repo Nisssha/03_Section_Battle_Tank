@@ -3,25 +3,7 @@
 #include "BattleTank.h"
 #include "TankAimingComponent.h"
 #include "TankPlayerController.h"
-#include "Tank.h"
 
-void ATankPlayerController::SetPawn(APawn* InPawn)
-{
-	Super::SetPawn(InPawn);
-	if (InPawn)
-	{
-		auto PossessedTank = Cast<ATank>(InPawn);
-		if (!ensure(PossessedTank)) { return; }
-
-		// Subscribe our local method to the tank's death event
-		PossessedTank->OnDeath.AddUniqueDynamic(this, &ATankPlayerController::OnPossedTankDeath);
-	}
-}
-
-void ATankPlayerController::OnPossedTankDeath()
-{
-	StartSpectatingOnly();
-}
 
 void ATankPlayerController::BeginPlay()
 {
@@ -39,13 +21,11 @@ void ATankPlayerController::Tick(float DeltaTime)
 
 void ATankPlayerController::AimTowardsCrosshair()
 {
-	if (!GetPawn()) { return; } // e.g. if not possessing
 	auto AimingComponent = GetPawn()->FindComponentByClass<UTankAimingComponent>();
 	if (!ensure(AimingComponent)) { return; }
 
 	FVector HitLocation; // Out parameter
-	bool bGotHitLocation = GetSightRayHitLocation(HitLocation);
-	if (bGotHitLocation) // Has "side-effect", is going to line trace
+	if (GetSightRayHitLocation(HitLocation)) // Has "side-effect", is going to line trace
 	{
 		AimingComponent->AimAt(HitLocation);
 	}
@@ -64,9 +44,10 @@ bool ATankPlayerController::GetSightRayHitLocation(FVector& HitLocation) const
 	if (GetLookDirection(ScreenLocation, LookDirection))
 	{
 		// Line-trace along that LookDirection, and see what we hit (up to max range)
-		return GetLookVectorHitLocation(LookDirection, HitLocation);
+		GetLookVectorHitLocation(LookDirection, HitLocation);
 	}
-	return false;
+	
+	return true;
 }
 
 bool ATankPlayerController::GetLookVectorHitLocation(FVector LookDirection, FVector& HitLocation) const
@@ -78,7 +59,7 @@ bool ATankPlayerController::GetLookVectorHitLocation(FVector LookDirection, FVec
 			HitResult,
 			StartLocation,
 			EndLocation,
-			ECollisionChannel::ECC_Camera)
+			ECollisionChannel::ECC_Visibility)
 		)
 	{
 		HitLocation = HitResult.Location;
